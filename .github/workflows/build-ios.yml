@@ -43,16 +43,17 @@ jobs:
           cp -f ios_custom/Info.plist ios/Runner/Info.plist
           cp -f ios_custom/Runner.entitlements ios/Runner/Runner.entitlements
 
-      - name: Install Dependencies & CocoaPods
+      - name: Configure Flutter iOS & Install CocoaPods
         run: |
           flutter pub get
+          flutter build ios --config-only
           cd ios
           pod install
           cd ..
 
       - name: Build iOS Application (Release, Sideload-Ready)
         run: |
-          flutter build ios --release --no-codesign --verbose
+          flutter build ios --release --no-codesign
 
       - name: Package Payload into Installable .IPA
         run: |
