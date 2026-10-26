@@ -1,0 +1,99 @@
+name: Build Fiscus Tap iOS (iPhone 11)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-ipa:
+    name: Build & Package iOS IPA
+    runs-on: macos-14
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Print Flutter & Xcode Environment
+        run: |
+          flutter --version
+          xcodebuild -version
+
+      - name: Generate Native iOS Project Structure
+        run: |
+          # Create official platform scaffolding
+          flutter create --org com.fiscustap --project-name fiscus_tap .
+          
+          # Restore our custom code and dependencies
+          git checkout HEAD -- pubspec.yaml lib/
+          
+          # Inject Custom NFC Permissions & Entitlements into Xcode
+          cp -f ios_custom/Info.plist ios/Runner/Info.plist
+          cp -f ios_custom/Runner.entitlements ios/Runner/Runner.entitlements
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Build iOS Application (Release, Sideload-Ready)
+        run: |
+          flutter build ios --release --no-codesign
+
+      - name: Package Payload into Installable .IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r -9 FiscusTap-v1.0.0-iPhone11.ipa Payload
+          echo "IPA Size: $(du -h FiscusTap-v1.0.0-iPhone11.ipa | cut -f1)"
+
+      - name: Upload IPA as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FiscusTap-v1.0.0-iPhone11-IPA
+          path: FiscusTap-v1.0.0-iPhone11.ipa
+          retention-days: 30
+
+      - name: Publish Direct IPA Download to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        with:
+          tag_name: v1.0.0
+          name: "Fiscus Tap iOS v1.0.0 (iPhone 11 Ready)"
+          body: |
+            ### 📱 Fiscus Tap iOS - Compilación Oficial en la Nube
+            
+            Archivo `.ipa` nativo compilado con Flutter y Xcode en macOS para **iPhone 11** (y cualquier iPhone con iOS 16+).
+            
+            ---
+            
+            ### 📥 Instrucciones para Instalación Directa desde Windows:
+            
+            1. **Descarga el archivo `.ipa`**:
+               - Descarga `FiscusTap-v1.0.0-iPhone11.ipa` adjunto abajo en esta misma página.
+            2. **Conecta tu iPhone 11**:
+               - Conecta tu iPhone 11 con su cable USB Lightning a tu laptop con Windows.
+               - Asegúrate de darle a "Confiar en este ordenador" en la pantalla de tu iPhone si te lo solicita.
+            3. **Instala con Sideloadly (Gratuito)**:
+               - Abre **Sideloadly** en Windows (descárgalo de [sideloadly.io](https://sideloadly.io) si aún no lo tienes instalado).
+               - Arrastra el archivo `FiscusTap-v1.0.0-iPhone11.ipa` a la ventana de Sideloadly.
+               - Ingresa tu Apple ID (cuenta gratuita de Apple).
+               - Haz clic en **Start**.
+            4. **Abrir en tu iPhone**:
+               - En menos de 60 segundos la app aparecerá en tu pantalla de inicio.
+               - La primera vez, ve a **Ajustes > General > Gestión de VPN y dispositivos** en tu iPhone y pulsa "Confiar en tu cuenta".
+               - ¡Abre **Fiscus Tap** y cobra con contactless!
+            
+            ---
+            *Tecnología Contactless Segura - Fiscus Tap Inc.*
+          files: FiscusTap-v1.0.0-iPhone11.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
