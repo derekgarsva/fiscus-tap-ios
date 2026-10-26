@@ -24,12 +24,13 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Print Flutter & Xcode Environment
+      - name: Print Environment
         run: |
           flutter --version
           xcodebuild -version
+          pod --version
 
-      - name: Generate Native iOS Project Structure
+      - name: Generate Native iOS Structure & Inject Custom Config
         run: |
           # Create official platform scaffolding
           flutter create --org com.fiscustap --project-name fiscus_tap .
@@ -37,16 +38,21 @@ jobs:
           # Restore our custom code and dependencies
           git checkout HEAD -- pubspec.yaml lib/
           
-          # Inject Custom NFC Permissions & Entitlements into Xcode
+          # Inject Custom Podfile, Info.plist & Entitlements
+          cp -f ios_custom/Podfile ios/Podfile
           cp -f ios_custom/Info.plist ios/Runner/Info.plist
           cp -f ios_custom/Runner.entitlements ios/Runner/Runner.entitlements
 
-      - name: Install Flutter Dependencies
-        run: flutter pub get
+      - name: Install Dependencies & CocoaPods
+        run: |
+          flutter pub get
+          cd ios
+          pod install
+          cd ..
 
       - name: Build iOS Application (Release, Sideload-Ready)
         run: |
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign --verbose
 
       - name: Package Payload into Installable .IPA
         run: |
