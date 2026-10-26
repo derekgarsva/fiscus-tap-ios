@@ -30,30 +30,25 @@ jobs:
           xcodebuild -version
           pod --version
 
-      - name: Generate Native iOS Structure & Inject Custom Config
+      - name: Generate Native iOS Structure & Configure Deployment Target
         run: |
-          # Create official platform scaffolding
+          # 1. Create official Flutter scaffolding
           flutter create --org com.fiscustap --project-name fiscus_tap .
           
-          # Restore our custom code and dependencies
+          # 2. Restore custom code and dependencies
           git checkout HEAD -- pubspec.yaml lib/
           
-          # Inject Custom Podfile, Info.plist & Entitlements
-          cp -f ios_custom/Podfile ios/Podfile
+          # 3. Set minimum iOS deployment target to 14.0 in Xcode project
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = 14.0;/g' ios/Runner.xcodeproj/project.pbxproj
+          
+          # 4. Copy custom Info.plist and Entitlements
           cp -f ios_custom/Info.plist ios/Runner/Info.plist
           cp -f ios_custom/Runner.entitlements ios/Runner/Runner.entitlements
 
-      - name: Configure Flutter iOS & Install CocoaPods
-        run: |
-          flutter pub get
-          flutter build ios --config-only
-          cd ios
-          pod install
-          cd ..
-
       - name: Build iOS Application (Release, Sideload-Ready)
         run: |
-          flutter build ios --release --no-codesign
+          flutter pub get
+          flutter build ios --release --no-codesign -v
 
       - name: Package Payload into Installable .IPA
         run: |
